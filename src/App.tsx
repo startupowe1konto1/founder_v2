@@ -286,22 +286,25 @@ export default function CoFounderTool() {
 Only return valid JSON. No markdown, no preamble.`;
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      // Send the prompt to your secure Vercel backend
+      const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }]
-        })
+        body: JSON.stringify({ prompt: prompt })
       });
       
       const data = await response.json();
-      const text = data.content?.map((b: { type: string; text?: string }) => b.text || "").join("") || "";
+      
+      // Extract the text from Gemini's specific response structure
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      
+      // Clean and parse the JSON
       const clean = text.replace(/```json|```/g, "").trim();
       const parsed: AnalysisResult = JSON.parse(clean);
       setAnalysis(parsed);
+      
     } catch (err) {
+      console.error("Analysis parsing error:", err);
       setAnalysisError("Could not generate analysis. Please check your responses and try again.");
     } finally {
       setAnalysisLoading(false);
