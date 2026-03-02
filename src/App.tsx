@@ -1,6 +1,38 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
-const SECTIONS = [
+// --- TYPES & INTERFACES ---
+interface Question {
+  id: number;
+  text: string;
+}
+
+interface Section {
+  id: number;
+  title: string;
+  subtitle: string;
+  accent: string;
+  questions: Question[];
+}
+
+interface TextareaProps {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder: string;
+  founderColor: string;
+}
+
+interface AnalysisResult {
+  overallScore: number;
+  headline: string;
+  summary: string;
+  strengths: { title: string; detail: string }[];
+  tensions: { title: string; detail: string; severity: string }[];
+  perFounder: { name: string; superpower: string; watchout: string; compatibility: number }[];
+  topRecommendations: string[];
+}
+
+// --- CONSTANTS ---
+const SECTIONS: Section[] = [
   {
     id: 0,
     title: "How You Operate",
@@ -106,26 +138,22 @@ const SECTIONS = [
       { id: 49, text: "How would you think about bringing on a third (or N+1) co-founder?" },
       { id: 50, text: "Wrap-up: Now that we know each other's weaknesses, passions, needs and constraints — how are we going to make each other successful? What would it take to feel truly partnered in this adventure?" },
     ]
-  },
+  }
 ];
 
 const FOUNDER_COLORS = ["#D4A853", "#7EB8C9", "#C9866E", "#A89FD4", "#7EB89A", "#C97EB0"];
 
-interface TextareaProps {
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  placeholder: string;
-  founderColor: string;
-}
-
+// --- COMPONENTS ---
 const AutoResizeTextarea = ({ value, onChange, placeholder, founderColor }: TextareaProps) => {
   const ref = useRef<HTMLTextAreaElement>(null);
+  
   useEffect(() => {
     if (ref.current) {
       ref.current.style.height = "auto";
       ref.current.style.height = Math.max(80, ref.current.scrollHeight) + "px";
     }
   }, [value]);
+
   return (
     <textarea
       ref={ref}
@@ -155,23 +183,13 @@ const AutoResizeTextarea = ({ value, onChange, placeholder, founderColor }: Text
   );
 };
 
-interface AnalysisResult {
-  overallScore: number;
-  headline: string;
-  summary: string;
-  strengths: { title: string; detail: string }[];
-  tensions: { title: string; detail: string; severity: string }[];
-  perFounder: { name: string; superpower: string; watchout: string; compatibility: number }[];
-  topRecommendations: string[];
-}
-
 export default function CoFounderTool() {
-  const [screen, setScreen] = useState("landing");
-  const [founders, setFounders] = useState(["", ""]);
-  const [currentSection, setCurrentSection] = useState(0);
+  const [screen, setScreen] = useState<string>("landing");
+  const [founders, setFounders] = useState<string[]>(["", ""]);
+  const [currentSection, setCurrentSection] = useState<number>(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
-  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisLoading, setAnalysisLoading] = useState<boolean>(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const topRef = useRef<HTMLDivElement>(null);
 
@@ -191,7 +209,7 @@ export default function CoFounderTool() {
 
   const removeFounder = (idx: number) => {
     if (founders.length > 2) {
-      const newF = founders.filter((_: string, i: number) => i !== idx);
+      const newF = founders.filter((_, i) => i !== idx);
       setFounders(newF);
     }
   };
@@ -202,7 +220,8 @@ export default function CoFounderTool() {
     setFounders(nf);
   };
 
-  const canStart = founders.filter((f: string) => f.trim()).length >= 2;
+  const activeFounders = founders.filter((f) => f.trim() !== "");
+  const canStart = activeFounders.length >= 2;
 
   const goToSection = (idx: number) => {
     setCurrentSection(idx);
@@ -210,18 +229,20 @@ export default function CoFounderTool() {
     topRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const getSectionProgress = (sectionId: number) => {
+  const getSectionProgress = (sectionId: number): number => {
     const section = SECTIONS[sectionId];
-    const totalFields = section.questions.length * founders.filter((f: string) => f.trim()).length;
-    const filled = section.questions.reduce((acc: number, q: { id: number; text: string }) => {
-      return acc + founders.filter((f: string, i: number) => f.trim() && getAnswer(sectionId, q.id, i).trim()).length;
+    const totalFields = section.questions.length * activeFounders.length;
+    
+    const filled = section.questions.reduce((acc: number, q: Question) => {
+      return acc + founders.filter((f, i) => f.trim() && getAnswer(sectionId, q.id, i).trim()).length;
     }, 0);
+    
     return totalFields === 0 ? 0 : Math.round((filled / totalFields) * 100);
   };
 
-  const getTotalProgress = () => {
-    const total = SECTIONS.reduce((acc: number, s: typeof SECTIONS[0]) => acc + s.questions.length, 0) * founders.filter((f: string) => f.trim()).length;
-    const filled = Object.values(answers).filter((v: string) => v.trim()).length;
+  const getTotalProgress = (): number => {
+    const total = SECTIONS.reduce((acc, s) => acc + s.questions.length, 0) * activeFounders.length;
+    const filled = Object.values(answers).filter((v) => v.trim() !== "").length;
     return total === 0 ? 0 : Math.round((filled / total) * 100);
   };
 
@@ -230,14 +251,13 @@ export default function CoFounderTool() {
     setAnalysisError(null);
     setScreen("analysis");
 
-    const activeFounders = founders.filter((f: string) => f.trim());
     let prompt = `You are analyzing co-founder compatibility for a startup. Here are the responses from ${activeFounders.length} potential co-founders to a comprehensive 50-question compatibility questionnaire.\n\n`;
 
-    SECTIONS.forEach(section => {
+    SECTIONS.forEach((section: Section) => {
       prompt += `\n## ${section.title.toUpperCase()}\n`;
-      section.questions.forEach(q => {
+      section.questions.forEach((q: Question) => {
         prompt += `\nQ${q.id}: ${q.text}\n`;
-        activeFounders.forEach((name: string, idx: number) => {
+        activeFounders.forEach((name, idx) => {
           const ans = getAnswer(section.id, q.id, idx);
           if (ans.trim()) prompt += `${name}: ${ans}\n`;
         });
@@ -250,21 +270,15 @@ export default function CoFounderTool() {
   "headline": "<one punchy sentence about this team>",
   "summary": "<3-4 sentence overall assessment>",
   "strengths": [
-    {"title": "<strength title>", "detail": "<1-2 sentences>"},
-    {"title": "<strength title>", "detail": "<1-2 sentences>"},
     {"title": "<strength title>", "detail": "<1-2 sentences>"}
   ],
   "tensions": [
-    {"title": "<tension title>", "detail": "<1-2 sentences>", "severity": "low|medium|high"},
-    {"title": "<tension title>", "detail": "<1-2 sentences>", "severity": "low|medium|high"},
     {"title": "<tension title>", "detail": "<1-2 sentences>", "severity": "low|medium|high"}
   ],
   "perFounder": [
-    ${activeFounders.map((name: string) => `{"name": "${name}", "superpower": "<their unique value>", "watchout": "<potential risk they bring>", "compatibility": <0-100>}`).join(",\n    ")}
+    ${activeFounders.map((name) => `{"name": "${name}", "superpower": "<their unique value>", "watchout": "<potential risk they bring>", "compatibility": <0-100>}`).join(",\n    ")}
   ],
   "topRecommendations": [
-    "<actionable recommendation>",
-    "<actionable recommendation>",
     "<actionable recommendation>"
   ]
 }
@@ -281,6 +295,7 @@ Only return valid JSON. No markdown, no preamble.`;
           messages: [{ role: "user", content: prompt }]
         })
       });
+      
       const data = await response.json();
       const text = data.content?.map((b: { type: string; text?: string }) => b.text || "").join("") || "";
       const clean = text.replace(/```json|```/g, "").trim();
@@ -294,7 +309,6 @@ Only return valid JSON. No markdown, no preamble.`;
   };
 
   const section = SECTIONS[currentSection];
-  const activeFounders = founders.filter((f: string) => f.trim());
 
   const styles = `
     @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
@@ -369,7 +383,7 @@ Only return valid JSON. No markdown, no preamble.`;
               </p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {founders.map((name: string, idx: number) => (
+                {founders.map((name, idx) => (
                   <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{
                       width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
@@ -384,7 +398,7 @@ Only return valid JSON. No markdown, no preamble.`;
                     <input
                       type="text"
                       value={name}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFounder(idx, e.target.value)}
+                      onChange={(e) => updateFounder(idx, e.target.value)}
                       placeholder={`Co-Founder ${idx + 1} name`}
                       style={{
                         flex: 1, background: "rgba(255,255,255,0.05)",
@@ -394,8 +408,8 @@ Only return valid JSON. No markdown, no preamble.`;
                         fontFamily: "'DM Sans', sans-serif",
                         outline: "none", transition: "border-color 0.2s",
                       }}
-                      onFocus={(e: React.FocusEvent<HTMLInputElement>) => { e.currentTarget.style.borderColor = FOUNDER_COLORS[idx] + "77"; }}
-                      onBlur={(e: React.FocusEvent<HTMLInputElement>) => { e.currentTarget.style.borderColor = name.trim() ? FOUNDER_COLORS[idx] + "44" : "rgba(255,255,255,0.08)"; }}
+                      onFocus={(e) => { e.currentTarget.style.borderColor = FOUNDER_COLORS[idx] + "77"; }}
+                      onBlur={(e) => { e.currentTarget.style.borderColor = name.trim() ? FOUNDER_COLORS[idx] + "44" : "rgba(255,255,255,0.08)"; }}
                     />
                     {idx >= 2 && (
                       <button
@@ -405,8 +419,8 @@ Only return valid JSON. No markdown, no preamble.`;
                           color: "#4A4640", fontSize: 18, padding: "0 4px",
                           display: "flex", alignItems: "center", transition: "color 0.2s",
                         }}
-                        onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#C9866E"; }}
-                        onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#4A4640"; }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = "#C9866E"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = "#4A4640"; }}
                       >×</button>
                     )}
                   </div>
@@ -422,8 +436,8 @@ Only return valid JSON. No markdown, no preamble.`;
                     color: "#6A6458", fontSize: 13, display: "flex", alignItems: "center", gap: 8,
                     fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s", width: "100%",
                   }}
-                  onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.borderColor = "rgba(212,168,83,0.5)"; e.currentTarget.style.color = "#D4A853"; }}
-                  onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.borderColor = "rgba(212,168,83,0.25)"; e.currentTarget.style.color = "#6A6458"; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(212,168,83,0.5)"; e.currentTarget.style.color = "#D4A853"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(212,168,83,0.25)"; e.currentTarget.style.color = "#6A6458"; }}
                 >
                   <span style={{ fontSize: 18, lineHeight: "1" }}>+</span>
                   Add another co-founder
@@ -444,15 +458,11 @@ Only return valid JSON. No markdown, no preamble.`;
                 fontSize: 18, fontWeight: 600, letterSpacing: "0.04em",
                 transition: "all 0.2s",
               }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { if (canStart) e.currentTarget.style.background = "#E0B85E"; }}
-              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { if (canStart) e.currentTarget.style.background = "#D4A853"; }}
+              onMouseEnter={(e) => { if (canStart) e.currentTarget.style.background = "#E0B85E"; }}
+              onMouseLeave={(e) => { if (canStart) e.currentTarget.style.background = "#D4A853"; }}
             >
               Begin Questionnaire →
             </button>
-
-            <p style={{ textAlign: "center", marginTop: 16, color: "#3A3830", fontSize: 12, letterSpacing: "0.05em" }}>
-              All responses are processed locally in your browser
-            </p>
           </div>
         </div>
       </>
@@ -504,8 +514,8 @@ Only return valid JSON. No markdown, no preamble.`;
                       borderRadius: 10, padding: "18px 22px", cursor: "pointer", textAlign: "left",
                       transition: "all 0.2s", display: "flex", alignItems: "center", gap: 16,
                     }}
-                    onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = sec.accent + "55"; }}
-                    onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; e.currentTarget.style.borderColor = prog === 100 ? sec.accent + "44" : "rgba(255,255,255,0.07)"; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = sec.accent + "55"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; e.currentTarget.style.borderColor = prog === 100 ? sec.accent + "44" : "rgba(255,255,255,0.07)"; }}
                   >
                     <div style={{
                       width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
@@ -570,8 +580,8 @@ Only return valid JSON. No markdown, no preamble.`;
                 marginTop: 20, background: "none", border: "none", cursor: "pointer",
                 color: "#3A3830", fontSize: 12, fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.05em",
               }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#6A6458"; }}
-              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#3A3830"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "#6A6458"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "#3A3830"; }}
             >
               ← Change participants
             </button>
@@ -599,8 +609,8 @@ Only return valid JSON. No markdown, no preamble.`;
               <button
                 onClick={() => setScreen("overview")}
                 style={{ background: "none", border: "none", cursor: "pointer", color: "#4A4640", fontSize: 13, fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}
-                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#8A8478"; }}
-                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#4A4640"; }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "#8A8478"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "#4A4640"; }}
               >← Overview</button>
               <div style={{ textAlign: "center" }}>
                 <span style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: section.accent, display: "block", lineHeight: "1", marginBottom: 3 }}>
@@ -633,7 +643,7 @@ Only return valid JSON. No markdown, no preamble.`;
           <div style={{ padding: "0 24px 80px", maxWidth: 1400, margin: "0 auto" }}>
             <div style={{ display: "grid", gridTemplateColumns: `2fr ${activeFounders.map(() => "1fr").join(" ")}`, gap: 12, marginBottom: 8 }}>
               <div style={{ fontSize: 11, color: "#3A3830", letterSpacing: "0.08em", textTransform: "uppercase", padding: "0 0 8px 0" }}>Question</div>
-              {activeFounders.map((name: string, idx: number) => (
+              {activeFounders.map((name, idx) => (
                 <div key={idx} style={{ fontSize: 12, letterSpacing: "0.05em", color: FOUNDER_COLORS[idx], padding: "0 0 8px 0", fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ width: 20, height: 20, borderRadius: "50%", background: FOUNDER_COLORS[idx] + "22", border: `1.5px solid ${FOUNDER_COLORS[idx]}55`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, flexShrink: 0 }}>
                     {name[0].toUpperCase()}
@@ -654,11 +664,11 @@ Only return valid JSON. No markdown, no preamble.`;
                       <p style={{ fontSize: 13, color: "#C0B8A8", lineHeight: 1.65, fontWeight: 300 }}>{q.text}</p>
                     </div>
                   </div>
-                  {activeFounders.map((name: string, idx: number) => (
+                  {activeFounders.map((name, idx) => (
                     <div key={idx}>
                       <AutoResizeTextarea
                         value={getAnswer(section.id, q.id, idx)}
-                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAnswer(section.id, q.id, idx, e.target.value)}
+                        onChange={(e) => setAnswer(section.id, q.id, idx, e.target.value)}
                         placeholder={`${name}'s answer…`}
                         founderColor={FOUNDER_COLORS[idx]}
                       />
@@ -709,8 +719,8 @@ Only return valid JSON. No markdown, no preamble.`;
             <button
               onClick={() => setScreen("overview")}
               style={{ background: "none", border: "none", cursor: "pointer", color: "#4A4640", fontSize: 13, fontFamily: "'DM Sans', sans-serif", marginBottom: 32, display: "flex", alignItems: "center", gap: 6 }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#8A8478"; }}
-              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#4A4640"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "#8A8478"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "#4A4640"; }}
             >← Back to overview</button>
 
             {analysisLoading && (
@@ -799,8 +809,8 @@ Only return valid JSON. No markdown, no preamble.`;
                   <button
                     onClick={runAnalysis}
                     style={{ background: "none", border: "1px solid rgba(212,168,83,0.25)", borderRadius: 7, padding: "10px 20px", cursor: "pointer", color: "#6A6458", fontFamily: "'DM Sans', sans-serif", fontSize: 12, transition: "all 0.2s" }}
-                    onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#D4A853"; e.currentTarget.style.borderColor = "rgba(212,168,83,0.5)"; }}
-                    onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#6A6458"; e.currentTarget.style.borderColor = "rgba(212,168,83,0.25)"; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#D4A853"; e.currentTarget.style.borderColor = "rgba(212,168,83,0.5)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "#6A6458"; e.currentTarget.style.borderColor = "rgba(212,168,83,0.25)"; }}
                   >↺ Regenerate analysis</button>
                 </div>
               </div>
