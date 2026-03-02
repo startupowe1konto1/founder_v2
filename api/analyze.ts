@@ -14,7 +14,7 @@ export default async function handler(req: any, res: any) {
     }
 
     // Using gemini-1.5-flash as it is the fastest and highly capable for text analysis
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
     // Extract the prompt we sent from the React frontend
     const { prompt } = req.body;
