@@ -111,8 +111,15 @@ const SECTIONS = [
 
 const FOUNDER_COLORS = ["#D4A853", "#7EB8C9", "#C9866E", "#A89FD4", "#7EB89A", "#C97EB0"];
 
-const AutoResizeTextarea = ({ value, onChange, placeholder, founderColor }) => {
-  const ref = useRef(null);
+interface TextareaProps {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder: string;
+  founderColor: string;
+}
+
+const AutoResizeTextarea = ({ value, onChange, placeholder, founderColor }: TextareaProps) => {
+  const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     if (ref.current) {
       ref.current.style.height = "auto";
@@ -142,69 +149,79 @@ const AutoResizeTextarea = ({ value, onChange, placeholder, founderColor }) => {
         boxSizing: "border-box",
         overflow: "hidden",
       }}
-      onFocus={e => e.target.style.borderColor = founderColor + "99"}
-      onBlur={e => e.target.style.borderColor = founderColor + "33"}
+      onFocus={(e: React.FocusEvent<HTMLTextAreaElement>) => { e.currentTarget.style.borderColor = founderColor + "99"; }}
+      onBlur={(e: React.FocusEvent<HTMLTextAreaElement>) => { e.currentTarget.style.borderColor = founderColor + "33"; }}
     />
   );
 };
 
+interface AnalysisResult {
+  overallScore: number;
+  headline: string;
+  summary: string;
+  strengths: { title: string; detail: string }[];
+  tensions: { title: string; detail: string; severity: string }[];
+  perFounder: { name: string; superpower: string; watchout: string; compatibility: number }[];
+  topRecommendations: string[];
+}
+
 export default function CoFounderTool() {
-  const [screen, setScreen] = useState("landing"); // landing | section | analysis
+  const [screen, setScreen] = useState("landing");
   const [founders, setFounders] = useState(["", ""]);
   const [currentSection, setCurrentSection] = useState(0);
-  const [answers, setAnswers] = useState({});
-  const [analysis, setAnalysis] = useState(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
-  const [analysisError, setAnalysisError] = useState(null);
-  const topRef = useRef(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const topRef = useRef<HTMLDivElement>(null);
 
-  const setAnswer = (sectionId, questionId, founderIdx, value) => {
+  const setAnswer = (sectionId: number, questionId: number, founderIdx: number, value: string) => {
     setAnswers(prev => ({
       ...prev,
       [`${sectionId}_${questionId}_${founderIdx}`]: value
     }));
   };
 
-  const getAnswer = (sectionId, questionId, founderIdx) =>
+  const getAnswer = (sectionId: number, questionId: number, founderIdx: number): string =>
     answers[`${sectionId}_${questionId}_${founderIdx}`] || "";
 
   const addFounder = () => {
     if (founders.length < 6) setFounders([...founders, ""]);
   };
 
-  const removeFounder = (idx) => {
+  const removeFounder = (idx: number) => {
     if (founders.length > 2) {
-      const newF = founders.filter((_, i) => i !== idx);
+      const newF = founders.filter((_: string, i: number) => i !== idx);
       setFounders(newF);
     }
   };
 
-  const updateFounder = (idx, val) => {
+  const updateFounder = (idx: number, val: string) => {
     const nf = [...founders];
     nf[idx] = val;
     setFounders(nf);
   };
 
-  const canStart = founders.filter(f => f.trim()).length >= 2;
+  const canStart = founders.filter((f: string) => f.trim()).length >= 2;
 
-  const goToSection = (idx) => {
+  const goToSection = (idx: number) => {
     setCurrentSection(idx);
     setScreen("section");
     topRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const getSectionProgress = (sectionId) => {
+  const getSectionProgress = (sectionId: number) => {
     const section = SECTIONS[sectionId];
-    const totalFields = section.questions.length * founders.filter(f => f.trim()).length;
-    const filled = section.questions.reduce((acc, q) => {
-      return acc + founders.filter((f, i) => f.trim() && getAnswer(sectionId, q.id, i).trim()).length;
+    const totalFields = section.questions.length * founders.filter((f: string) => f.trim()).length;
+    const filled = section.questions.reduce((acc: number, q: { id: number; text: string }) => {
+      return acc + founders.filter((f: string, i: number) => f.trim() && getAnswer(sectionId, q.id, i).trim()).length;
     }, 0);
     return totalFields === 0 ? 0 : Math.round((filled / totalFields) * 100);
   };
 
   const getTotalProgress = () => {
-    const total = SECTIONS.reduce((acc, s) => acc + s.questions.length, 0) * founders.filter(f => f.trim()).length;
-    const filled = Object.values(answers).filter(v => v.trim()).length;
+    const total = SECTIONS.reduce((acc: number, s: typeof SECTIONS[0]) => acc + s.questions.length, 0) * founders.filter((f: string) => f.trim()).length;
+    const filled = Object.values(answers).filter((v: string) => v.trim()).length;
     return total === 0 ? 0 : Math.round((filled / total) * 100);
   };
 
@@ -213,14 +230,14 @@ export default function CoFounderTool() {
     setAnalysisError(null);
     setScreen("analysis");
 
-    const activeFounders = founders.filter(f => f.trim());
+    const activeFounders = founders.filter((f: string) => f.trim());
     let prompt = `You are analyzing co-founder compatibility for a startup. Here are the responses from ${activeFounders.length} potential co-founders to a comprehensive 50-question compatibility questionnaire.\n\n`;
 
     SECTIONS.forEach(section => {
       prompt += `\n## ${section.title.toUpperCase()}\n`;
       section.questions.forEach(q => {
         prompt += `\nQ${q.id}: ${q.text}\n`;
-        activeFounders.forEach((name, idx) => {
+        activeFounders.forEach((name: string, idx: number) => {
           const ans = getAnswer(section.id, q.id, idx);
           if (ans.trim()) prompt += `${name}: ${ans}\n`;
         });
@@ -243,7 +260,7 @@ export default function CoFounderTool() {
     {"title": "<tension title>", "detail": "<1-2 sentences>", "severity": "low|medium|high"}
   ],
   "perFounder": [
-    ${activeFounders.map(name => `{"name": "${name}", "superpower": "<their unique value>", "watchout": "<potential risk they bring>", "compatibility": <0-100>}`).join(",\n    ")}
+    ${activeFounders.map((name: string) => `{"name": "${name}", "superpower": "<their unique value>", "watchout": "<potential risk they bring>", "compatibility": <0-100>}`).join(",\n    ")}
   ],
   "topRecommendations": [
     "<actionable recommendation>",
@@ -265,9 +282,9 @@ Only return valid JSON. No markdown, no preamble.`;
         })
       });
       const data = await response.json();
-      const text = data.content?.map(b => b.text || "").join("") || "";
+      const text = data.content?.map((b: { type: string; text?: string }) => b.text || "").join("") || "";
       const clean = text.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(clean);
+      const parsed: AnalysisResult = JSON.parse(clean);
       setAnalysis(parsed);
     } catch (err) {
       setAnalysisError("Could not generate analysis. Please check your responses and try again.");
@@ -277,9 +294,8 @@ Only return valid JSON. No markdown, no preamble.`;
   };
 
   const section = SECTIONS[currentSection];
-  const activeFounders = founders.filter(f => f.trim());
+  const activeFounders = founders.filter((f: string) => f.trim());
 
-  // ========== STYLES ==========
   const styles = `
     @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -287,8 +303,6 @@ Only return valid JSON. No markdown, no preamble.`;
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: #1a1916; }
     ::-webkit-scrollbar-thumb { background: #3a3830; border-radius: 3px; }
-    .pulse { animation: pulse 2s ease-in-out infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
     @keyframes fadeIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
     .fadeIn { animation: fadeIn 0.5s ease forwards; }
     @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
@@ -310,18 +324,14 @@ Only return valid JSON. No markdown, no preamble.`;
           justifyContent: "center", padding: "40px 20px",
           fontFamily: "'DM Sans', sans-serif",
         }}>
-          {/* Ambient background */}
           <div style={{
             position: "fixed", inset: 0, pointerEvents: "none",
             background: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(212,168,83,0.06) 0%, transparent 70%)",
           }} />
 
           <div className="fadeIn" style={{ maxWidth: 560, width: "100%", position: "relative" }}>
-            {/* Logo mark */}
             <div style={{ textAlign: "center", marginBottom: 40 }}>
-              <div style={{
-                display: "inline-flex", gap: 3, marginBottom: 20,
-              }}>
+              <div style={{ display: "inline-flex", gap: 3, marginBottom: 20 }}>
                 {[0,1,2].map(i => (
                   <div key={i} style={{
                     width: 8, height: 8, borderRadius: "50%",
@@ -332,11 +342,8 @@ Only return valid JSON. No markdown, no preamble.`;
               <h1 style={{
                 fontFamily: "'Cormorant Garamond', serif",
                 fontSize: "clamp(36px, 6vw, 52px)",
-                fontWeight: 300,
-                color: "#F0E8D8",
-                letterSpacing: "-0.02em",
-                lineHeight: 1.1,
-                marginBottom: 12,
+                fontWeight: 300, color: "#F0E8D8",
+                letterSpacing: "-0.02em", lineHeight: 1.1, marginBottom: 12,
               }}>
                 Co-Founder<br/>
                 <em style={{ color: "#D4A853", fontWeight: 400 }}>Compatibility</em>
@@ -349,7 +356,6 @@ Only return valid JSON. No markdown, no preamble.`;
               </p>
             </div>
 
-            {/* Founders input */}
             <div style={{
               background: "rgba(255,255,255,0.03)",
               border: "1px solid rgba(212,168,83,0.15)",
@@ -363,7 +369,7 @@ Only return valid JSON. No markdown, no preamble.`;
               </p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {founders.map((name, idx) => (
+                {founders.map((name: string, idx: number) => (
                   <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{
                       width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
@@ -378,7 +384,7 @@ Only return valid JSON. No markdown, no preamble.`;
                     <input
                       type="text"
                       value={name}
-                      onChange={e => updateFounder(idx, e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFounder(idx, e.target.value)}
                       placeholder={`Co-Founder ${idx + 1} name`}
                       style={{
                         flex: 1, background: "rgba(255,255,255,0.05)",
@@ -388,8 +394,8 @@ Only return valid JSON. No markdown, no preamble.`;
                         fontFamily: "'DM Sans', sans-serif",
                         outline: "none", transition: "border-color 0.2s",
                       }}
-                      onFocus={e => e.target.style.borderColor = FOUNDER_COLORS[idx] + "77"}
-                      onBlur={e => e.target.style.borderColor = name.trim() ? FOUNDER_COLORS[idx] + "44" : "rgba(255,255,255,0.08)"}
+                      onFocus={(e: React.FocusEvent<HTMLInputElement>) => { e.currentTarget.style.borderColor = FOUNDER_COLORS[idx] + "77"; }}
+                      onBlur={(e: React.FocusEvent<HTMLInputElement>) => { e.currentTarget.style.borderColor = name.trim() ? FOUNDER_COLORS[idx] + "44" : "rgba(255,255,255,0.08)"; }}
                     />
                     {idx >= 2 && (
                       <button
@@ -397,11 +403,10 @@ Only return valid JSON. No markdown, no preamble.`;
                         style={{
                           background: "none", border: "none", cursor: "pointer",
                           color: "#4A4640", fontSize: 18, padding: "0 4px",
-                          display: "flex", alignItems: "center",
-                          transition: "color 0.2s",
+                          display: "flex", alignItems: "center", transition: "color 0.2s",
                         }}
-                        onMouseEnter={e => e.target.style.color = "#C9866E"}
-                        onMouseLeave={e => e.target.style.color = "#4A4640"}
+                        onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#C9866E"; }}
+                        onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#4A4640"; }}
                       >×</button>
                     )}
                   </div>
@@ -417,17 +422,16 @@ Only return valid JSON. No markdown, no preamble.`;
                     color: "#6A6458", fontSize: 13, display: "flex", alignItems: "center", gap: 8,
                     fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s", width: "100%",
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(212,168,83,0.5)"; e.currentTarget.style.color = "#D4A853"; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(212,168,83,0.25)"; e.currentTarget.style.color = "#6A6458"; }}
+                  onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.borderColor = "rgba(212,168,83,0.5)"; e.currentTarget.style.color = "#D4A853"; }}
+                  onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.borderColor = "rgba(212,168,83,0.25)"; e.currentTarget.style.color = "#6A6458"; }}
                 >
-                  <span style={{ fontSize: 18, lineHeight: 1 }}>+</span>
+                  <span style={{ fontSize: 18, lineHeight: "1" }}>+</span>
                   Add another co-founder
                   <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.6 }}>{founders.length}/6</span>
                 </button>
               )}
             </div>
 
-            {/* Start button */}
             <button
               onClick={() => { setScreen("overview"); }}
               disabled={!canStart}
@@ -440,16 +444,13 @@ Only return valid JSON. No markdown, no preamble.`;
                 fontSize: 18, fontWeight: 600, letterSpacing: "0.04em",
                 transition: "all 0.2s",
               }}
-              onMouseEnter={e => { if (canStart) e.currentTarget.style.background = "#E0B85E"; }}
-              onMouseLeave={e => { if (canStart) e.currentTarget.style.background = "#D4A853"; }}
+              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { if (canStart) e.currentTarget.style.background = "#E0B85E"; }}
+              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { if (canStart) e.currentTarget.style.background = "#D4A853"; }}
             >
               Begin Questionnaire →
             </button>
 
-            <p style={{
-              textAlign: "center", marginTop: 16,
-              color: "#3A3830", fontSize: 12, letterSpacing: "0.05em",
-            }}>
+            <p style={{ textAlign: "center", marginTop: 16, color: "#3A3830", fontSize: 12, letterSpacing: "0.05em" }}>
               All responses are processed locally in your browser
             </p>
           </div>
@@ -458,27 +459,16 @@ Only return valid JSON. No markdown, no preamble.`;
     );
   }
 
-  // ========== OVERVIEW / SECTION MAP ==========
+  // ========== OVERVIEW ==========
   if (screen === "overview") {
     return (
       <>
         <style>{styles}</style>
-        <div style={{
-          minHeight: "100vh", background: "#0D0C0A",
-          fontFamily: "'DM Sans', sans-serif",
-          padding: "40px 20px",
-        }}>
+        <div style={{ minHeight: "100vh", background: "#0D0C0A", fontFamily: "'DM Sans', sans-serif", padding: "40px 20px" }}>
           <div style={{ maxWidth: 700, margin: "0 auto" }} className="fadeIn">
-            {/* Header */}
-            <div style={{
-              display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-              marginBottom: 40,
-            }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 40 }}>
               <div>
-                <h2 style={{
-                  fontFamily: "'Cormorant Garamond', serif", fontSize: 32,
-                  fontWeight: 300, color: "#F0E8D8", marginBottom: 6,
-                }}>
+                <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 32, fontWeight: 300, color: "#F0E8D8", marginBottom: 6 }}>
                   7 Sections to Complete
                 </h2>
                 <p style={{ color: "#6A6458", fontSize: 13 }}>
@@ -489,32 +479,18 @@ Only return valid JSON. No markdown, no preamble.`;
                 <button
                   onClick={runAnalysis}
                   style={{
-                    padding: "10px 20px", background: "#D4A853",
-                    border: "none", borderRadius: 7, cursor: "pointer",
-                    color: "#0D0C0A", fontFamily: "'DM Sans', sans-serif",
+                    padding: "10px 20px", background: "#D4A853", border: "none", borderRadius: 7,
+                    cursor: "pointer", color: "#0D0C0A", fontFamily: "'DM Sans', sans-serif",
                     fontSize: 13, fontWeight: 500, transition: "all 0.2s",
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#E0B85E"}
-                  onMouseLeave={e => e.currentTarget.style.background = "#D4A853"}
-                >
-                  Analyse →
-                </button>
+                >Analyse →</button>
               )}
             </div>
 
-            {/* Progress bar */}
-            <div style={{
-              height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2,
-              marginBottom: 36, overflow: "hidden",
-            }}>
-              <div style={{
-                height: "100%", width: getTotalProgress() + "%",
-                background: "linear-gradient(90deg, #D4A853, #C9866E)",
-                borderRadius: 2, transition: "width 0.6s ease",
-              }} />
+            <div style={{ height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2, marginBottom: 36, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: getTotalProgress() + "%", background: "linear-gradient(90deg, #D4A853, #C9866E)", borderRadius: 2, transition: "width 0.6s ease" }} />
             </div>
 
-            {/* Section cards */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {SECTIONS.map((sec, idx) => {
                 const prog = getSectionProgress(sec.id);
@@ -525,21 +501,12 @@ Only return valid JSON. No markdown, no preamble.`;
                     style={{
                       background: "rgba(255,255,255,0.025)",
                       border: `1px solid ${prog === 100 ? sec.accent + "44" : "rgba(255,255,255,0.07)"}`,
-                      borderRadius: 10, padding: "18px 22px",
-                      cursor: "pointer", textAlign: "left",
-                      transition: "all 0.2s", display: "flex",
-                      alignItems: "center", gap: 16,
+                      borderRadius: 10, padding: "18px 22px", cursor: "pointer", textAlign: "left",
+                      transition: "all 0.2s", display: "flex", alignItems: "center", gap: 16,
                     }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-                      e.currentTarget.style.borderColor = sec.accent + "55";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.025)";
-                      e.currentTarget.style.borderColor = prog === 100 ? sec.accent + "44" : "rgba(255,255,255,0.07)";
-                    }}
+                    onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = sec.accent + "55"; }}
+                    onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; e.currentTarget.style.borderColor = prog === 100 ? sec.accent + "44" : "rgba(255,255,255,0.07)"; }}
                   >
-                    {/* Number */}
                     <div style={{
                       width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
                       background: prog === 100 ? sec.accent + "22" : "rgba(255,255,255,0.04)",
@@ -549,28 +516,15 @@ Only return valid JSON. No markdown, no preamble.`;
                     }}>
                       {prog === 100 ? "✓" : `0${idx + 1}`}
                     </div>
-
-                    {/* Text */}
                     <div style={{ flex: 1 }}>
-                      <div style={{
-                        fontSize: 15, color: "#E8E0D0", fontWeight: 400,
-                        marginBottom: 2,
-                      }}>{sec.title}</div>
+                      <div style={{ fontSize: 15, color: "#E8E0D0", fontWeight: 400, marginBottom: 2 }}>{sec.title}</div>
                       <div style={{ fontSize: 12, color: "#5A5448" }}>{sec.subtitle}</div>
                     </div>
-
-                    {/* Progress */}
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{ width: 60, height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2 }}>
-                        <div style={{
-                          height: "100%", width: prog + "%",
-                          background: sec.accent, borderRadius: 2,
-                          transition: "width 0.4s",
-                        }} />
+                        <div style={{ height: "100%", width: prog + "%", background: sec.accent, borderRadius: 2, transition: "width 0.4s" }} />
                       </div>
-                      <span style={{ fontSize: 11, color: prog > 0 ? sec.accent : "#3A3830", minWidth: 28 }}>
-                        {prog}%
-                      </span>
+                      <span style={{ fontSize: 11, color: prog > 0 ? sec.accent : "#3A3830", minWidth: 28 }}>{prog}%</span>
                       <span style={{ fontSize: 16, color: "#3A3830" }}>›</span>
                     </div>
                   </button>
@@ -578,19 +532,14 @@ Only return valid JSON. No markdown, no preamble.`;
               })}
             </div>
 
-            {/* Analyse CTA */}
             {getTotalProgress() > 0 && (
               <div style={{
                 marginTop: 24, padding: "20px 22px",
-                background: "rgba(212,168,83,0.06)",
-                border: "1px solid rgba(212,168,83,0.18)",
-                borderRadius: 10, display: "flex",
-                justifyContent: "space-between", alignItems: "center",
+                background: "rgba(212,168,83,0.06)", border: "1px solid rgba(212,168,83,0.18)",
+                borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center",
               }}>
                 <div>
-                  <div style={{ fontSize: 13, color: "#D4A853", marginBottom: 3 }}>
-                    AI Compatibility Analysis
-                  </div>
+                  <div style={{ fontSize: 13, color: "#D4A853", marginBottom: 3 }}>AI Compatibility Analysis</div>
                   <div style={{ fontSize: 12, color: "#5A5448" }}>
                     {getTotalProgress() < 30
                       ? `Complete at least 30% of questions for meaningful analysis (currently ${getTotalProgress()}%)`
@@ -606,10 +555,8 @@ Only return valid JSON. No markdown, no preamble.`;
                     border: "none", borderRadius: 7,
                     cursor: getTotalProgress() >= 30 ? "pointer" : "not-allowed",
                     color: getTotalProgress() >= 30 ? "#0D0C0A" : "#4A4640",
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontSize: 13, fontWeight: 500,
-                    whiteSpace: "nowrap", flexShrink: 0,
-                    marginLeft: 16, transition: "all 0.2s",
+                    fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500,
+                    whiteSpace: "nowrap", flexShrink: 0, marginLeft: 16, transition: "all 0.2s",
                   }}
                 >
                   Run Analysis →
@@ -620,12 +567,11 @@ Only return valid JSON. No markdown, no preamble.`;
             <button
               onClick={() => setScreen("landing")}
               style={{
-                marginTop: 20, background: "none", border: "none",
-                cursor: "pointer", color: "#3A3830", fontSize: 12,
-                fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.05em",
+                marginTop: 20, background: "none", border: "none", cursor: "pointer",
+                color: "#3A3830", fontSize: 12, fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.05em",
               }}
-              onMouseEnter={e => e.target.style.color = "#6A6458"}
-              onMouseLeave={e => e.target.style.color = "#3A3830"}
+              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#6A6458"; }}
+              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#3A3830"; }}
             >
               ← Change participants
             </button>
@@ -641,77 +587,38 @@ Only return valid JSON. No markdown, no preamble.`;
       <>
         <style>{styles}</style>
         <div ref={topRef} style={{ background: "#0D0C0A", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif" }}>
-          {/* Sticky header */}
           <div style={{
             position: "sticky", top: 0, zIndex: 100,
-            background: "rgba(13,12,10,0.95)",
-            backdropFilter: "blur(20px)",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
-            padding: "0 24px",
+            background: "rgba(13,12,10,0.95)", backdropFilter: "blur(20px)",
+            borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 24px",
           }}>
-            {/* Progress bar */}
             <div style={{ height: 2, background: "rgba(255,255,255,0.04)" }}>
-              <div style={{
-                height: "100%",
-                width: ((currentSection + 1) / SECTIONS.length * 100) + "%",
-                background: section.accent,
-                transition: "width 0.4s",
-              }} />
+              <div style={{ height: "100%", width: ((currentSection + 1) / SECTIONS.length * 100) + "%", background: section.accent, transition: "width 0.4s" }} />
             </div>
-
-            <div style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "12px 0",
-            }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0" }}>
               <button
                 onClick={() => setScreen("overview")}
-                style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  color: "#4A4640", fontSize: 13, fontFamily: "'DM Sans', sans-serif",
-                  display: "flex", alignItems: "center", gap: 6,
-                }}
-                onMouseEnter={e => e.currentTarget.style.color = "#8A8478"}
-                onMouseLeave={e => e.currentTarget.style.color = "#4A4640"}
-              >
-                ← Overview
-              </button>
-
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#4A4640", fontSize: 13, fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}
+                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#8A8478"; }}
+                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#4A4640"; }}
+              >← Overview</button>
               <div style={{ textAlign: "center" }}>
-                <span style={{
-                  fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase",
-                  color: section.accent, display: "block", lineHeight: 1, marginBottom: 3,
-                }}>
+                <span style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: section.accent, display: "block", lineHeight: "1", marginBottom: 3 }}>
                   {currentSection + 1} / {SECTIONS.length}
                 </span>
-                <span style={{
-                  fontFamily: "'Cormorant Garamond', serif", fontSize: 17,
-                  color: "#E8E0D0", fontWeight: 400,
-                }}>
+                <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 17, color: "#E8E0D0", fontWeight: 400 }}>
                   {section.title}
                 </span>
               </div>
-
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   onClick={() => { if (currentSection > 0) goToSection(currentSection - 1); }}
                   disabled={currentSection === 0}
-                  style={{
-                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 6, padding: "6px 12px", cursor: currentSection === 0 ? "not-allowed" : "pointer",
-                    color: currentSection === 0 ? "#3A3830" : "#8A8478", fontSize: 16,
-                  }}
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, padding: "6px 12px", cursor: currentSection === 0 ? "not-allowed" : "pointer", color: currentSection === 0 ? "#3A3830" : "#8A8478", fontSize: 16 }}
                 >←</button>
                 <button
-                  onClick={() => {
-                    if (currentSection < SECTIONS.length - 1) goToSection(currentSection + 1);
-                    else setScreen("overview");
-                  }}
-                  style={{
-                    background: section.accent + "22",
-                    border: `1px solid ${section.accent}44`,
-                    borderRadius: 6, padding: "6px 12px", cursor: "pointer",
-                    color: section.accent, fontSize: 16,
-                  }}
+                  onClick={() => { if (currentSection < SECTIONS.length - 1) goToSection(currentSection + 1); else setScreen("overview"); }}
+                  style={{ background: section.accent + "22", border: `1px solid ${section.accent}44`, borderRadius: 6, padding: "6px 12px", cursor: "pointer", color: section.accent, fontSize: 16 }}
                 >
                   {currentSection < SECTIONS.length - 1 ? "→" : "✓"}
                 </button>
@@ -719,43 +626,16 @@ Only return valid JSON. No markdown, no preamble.`;
             </div>
           </div>
 
-          {/* Section intro */}
-          <div style={{
-            padding: "32px 24px 16px",
-            maxWidth: 1400, margin: "0 auto",
-          }}>
-            <p style={{ color: "#5A5448", fontSize: 12, letterSpacing: "0.06em" }}>
-              {section.subtitle}
-            </p>
+          <div style={{ padding: "32px 24px 16px", maxWidth: 1400, margin: "0 auto" }}>
+            <p style={{ color: "#5A5448", fontSize: 12, letterSpacing: "0.06em" }}>{section.subtitle}</p>
           </div>
 
-          {/* Questions table */}
-          <div style={{
-            padding: "0 24px 80px",
-            maxWidth: 1400, margin: "0 auto",
-          }}>
-            {/* Column headers */}
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: `2fr ${activeFounders.map(() => "1fr").join(" ")}`,
-              gap: 12, marginBottom: 8,
-            }}>
-              <div style={{ fontSize: 11, color: "#3A3830", letterSpacing: "0.08em", textTransform: "uppercase", padding: "0 0 8px 0" }}>
-                Question
-              </div>
-              {activeFounders.map((name, idx) => (
-                <div key={idx} style={{
-                  fontSize: 12, letterSpacing: "0.05em",
-                  color: FOUNDER_COLORS[idx], padding: "0 0 8px 0",
-                  fontWeight: 500, display: "flex", alignItems: "center", gap: 8,
-                }}>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: "50%",
-                    background: FOUNDER_COLORS[idx] + "22",
-                    border: `1.5px solid ${FOUNDER_COLORS[idx]}55`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 10, flexShrink: 0,
-                  }}>
+          <div style={{ padding: "0 24px 80px", maxWidth: 1400, margin: "0 auto" }}>
+            <div style={{ display: "grid", gridTemplateColumns: `2fr ${activeFounders.map(() => "1fr").join(" ")}`, gap: 12, marginBottom: 8 }}>
+              <div style={{ fontSize: 11, color: "#3A3830", letterSpacing: "0.08em", textTransform: "uppercase", padding: "0 0 8px 0" }}>Question</div>
+              {activeFounders.map((name: string, idx: number) => (
+                <div key={idx} style={{ fontSize: 12, letterSpacing: "0.05em", color: FOUNDER_COLORS[idx], padding: "0 0 8px 0", fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: FOUNDER_COLORS[idx] + "22", border: `1.5px solid ${FOUNDER_COLORS[idx]}55`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, flexShrink: 0 }}>
                     {name[0].toUpperCase()}
                   </div>
                   {name}
@@ -763,47 +643,22 @@ Only return valid JSON. No markdown, no preamble.`;
               ))}
             </div>
 
-            {/* Rows */}
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               {section.questions.map((q, qIdx) => (
-                <div
-                  key={q.id}
-                  className="fadeIn"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: `2fr ${activeFounders.map(() => "1fr").join(" ")}`,
-                    gap: 12, padding: "16px 0",
-                    borderBottom: "1px solid rgba(255,255,255,0.04)",
-                    animationDelay: `${qIdx * 0.05}s`,
-                  }}
-                >
-                  {/* Question */}
+                <div key={q.id} className="fadeIn" style={{ display: "grid", gridTemplateColumns: `2fr ${activeFounders.map(() => "1fr").join(" ")}`, gap: 12, padding: "16px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", animationDelay: `${qIdx * 0.05}s` }}>
                   <div style={{ paddingRight: 16 }}>
-                    <div style={{
-                      display: "flex", gap: 10, alignItems: "flex-start",
-                    }}>
-                      <span style={{
-                        fontSize: 10, color: section.accent + "88",
-                        fontWeight: 600, letterSpacing: "0.05em",
-                        minWidth: 20, paddingTop: 1,
-                      }}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                      <span style={{ fontSize: 10, color: section.accent + "88", fontWeight: 600, letterSpacing: "0.05em", minWidth: 20, paddingTop: 1 }}>
                         {String(q.id).padStart(2, "0")}
                       </span>
-                      <p style={{
-                        fontSize: 13, color: "#C0B8A8",
-                        lineHeight: 1.65, fontWeight: 300,
-                      }}>
-                        {q.text}
-                      </p>
+                      <p style={{ fontSize: 13, color: "#C0B8A8", lineHeight: 1.65, fontWeight: 300 }}>{q.text}</p>
                     </div>
                   </div>
-
-                  {/* Answer cells */}
-                  {activeFounders.map((name, idx) => (
+                  {activeFounders.map((name: string, idx: number) => (
                     <div key={idx}>
                       <AutoResizeTextarea
                         value={getAnswer(section.id, q.id, idx)}
-                        onChange={e => setAnswer(section.id, q.id, idx, e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAnswer(section.id, q.id, idx, e.target.value)}
                         placeholder={`${name}'s answer…`}
                         founderColor={FOUNDER_COLORS[idx]}
                       />
@@ -814,61 +669,20 @@ Only return valid JSON. No markdown, no preamble.`;
             </div>
           </div>
 
-          {/* Bottom nav */}
-          <div style={{
-            position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
-            background: "rgba(13,12,10,0.96)", backdropFilter: "blur(20px)",
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-            padding: "14px 24px",
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-          }}>
-            <div style={{
-              display: "flex", gap: 6,
-            }}>
+          <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100, background: "rgba(13,12,10,0.96)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.06)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 6 }}>
               {SECTIONS.map((s, i) => (
-                <button
-                  key={i}
-                  onClick={() => goToSection(i)}
-                  style={{
-                    width: i === currentSection ? 24 : 6,
-                    height: 6, borderRadius: 3,
-                    background: i === currentSection ? s.accent : getSectionProgress(i) > 0 ? s.accent + "55" : "rgba(255,255,255,0.1)",
-                    border: "none", cursor: "pointer",
-                    transition: "all 0.3s",
-                    padding: 0,
-                  }}
-                />
+                <button key={i} onClick={() => goToSection(i)} style={{ width: i === currentSection ? 24 : 6, height: 6, borderRadius: 3, background: i === currentSection ? s.accent : getSectionProgress(i) > 0 ? s.accent + "55" : "rgba(255,255,255,0.1)", border: "none", cursor: "pointer", transition: "all 0.3s", padding: 0 }} />
               ))}
             </div>
-
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <span style={{ fontSize: 11, color: "#3A3830" }}>
-                {getSectionProgress(currentSection)}% filled
-              </span>
+              <span style={{ fontSize: 11, color: "#3A3830" }}>{getSectionProgress(currentSection)}% filled</span>
               {currentSection < SECTIONS.length - 1 ? (
-                <button
-                  onClick={() => goToSection(currentSection + 1)}
-                  style={{
-                    background: section.accent, border: "none", borderRadius: 7,
-                    padding: "9px 20px", cursor: "pointer",
-                    color: "#0D0C0A", fontFamily: "'DM Sans', sans-serif",
-                    fontSize: 13, fontWeight: 500, transition: "all 0.2s",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
-                  onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-                >
+                <button onClick={() => goToSection(currentSection + 1)} style={{ background: section.accent, border: "none", borderRadius: 7, padding: "9px 20px", cursor: "pointer", color: "#0D0C0A", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, transition: "all 0.2s" }}>
                   Next Section →
                 </button>
               ) : (
-                <button
-                  onClick={() => setScreen("overview")}
-                  style={{
-                    background: "#D4A853", border: "none", borderRadius: 7,
-                    padding: "9px 20px", cursor: "pointer",
-                    color: "#0D0C0A", fontFamily: "'DM Sans', sans-serif",
-                    fontSize: 13, fontWeight: 500,
-                  }}
-                >
+                <button onClick={() => setScreen("overview")} style={{ background: "#D4A853", border: "none", borderRadius: 7, padding: "9px 20px", cursor: "pointer", color: "#0D0C0A", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500 }}>
                   Back to Overview ✓
                 </button>
               )}
@@ -890,118 +704,44 @@ Only return valid JSON. No markdown, no preamble.`;
     return (
       <>
         <style>{styles}</style>
-        <div style={{
-          minHeight: "100vh", background: "#0D0C0A",
-          fontFamily: "'DM Sans', sans-serif",
-          padding: "40px 20px 80px",
-        }}>
+        <div style={{ minHeight: "100vh", background: "#0D0C0A", fontFamily: "'DM Sans', sans-serif", padding: "40px 20px 80px" }}>
           <div style={{ maxWidth: 760, margin: "0 auto" }} className="fadeIn">
-            {/* Back */}
             <button
               onClick={() => setScreen("overview")}
-              style={{
-                background: "none", border: "none", cursor: "pointer",
-                color: "#4A4640", fontSize: 13, fontFamily: "'DM Sans', sans-serif",
-                marginBottom: 32, display: "flex", alignItems: "center", gap: 6,
-              }}
-              onMouseEnter={e => e.currentTarget.style.color = "#8A8478"}
-              onMouseLeave={e => e.currentTarget.style.color = "#4A4640"}
-            >
-              ← Back to overview
-            </button>
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#4A4640", fontSize: 13, fontFamily: "'DM Sans', sans-serif", marginBottom: 32, display: "flex", alignItems: "center", gap: 6 }}
+              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#8A8478"; }}
+              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#4A4640"; }}
+            >← Back to overview</button>
 
-            {/* Loading state */}
             {analysisLoading && (
               <div style={{ textAlign: "center", padding: "80px 0" }}>
-                <div style={{
-                  fontFamily: "'Cormorant Garamond', serif", fontSize: 36,
-                  color: "#F0E8D8", fontWeight: 300, marginBottom: 16,
-                }}>
-                  Analysing your team…
-                </div>
-                <p style={{ color: "#5A5448", fontSize: 14, marginBottom: 40 }}>
-                  Claude is reading through all your responses
-                </p>
-                {/* Shimmer cards */}
-                {[1,2,3].map(i => (
-                  <div key={i} className="shimmer" style={{
-                    height: 80, borderRadius: 10, marginBottom: 10,
-                  }} />
-                ))}
+                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, color: "#F0E8D8", fontWeight: 300, marginBottom: 16 }}>Analysing your team…</div>
+                <p style={{ color: "#5A5448", fontSize: 14, marginBottom: 40 }}>Claude is reading through all your responses</p>
+                {[1,2,3].map(i => (<div key={i} className="shimmer" style={{ height: 80, borderRadius: 10, marginBottom: 10 }} />))}
               </div>
             )}
 
-            {/* Error state */}
             {analysisError && (
-              <div style={{
-                textAlign: "center", padding: 40,
-                background: "rgba(201,134,110,0.08)",
-                border: "1px solid rgba(201,134,110,0.2)",
-                borderRadius: 10,
-              }}>
+              <div style={{ textAlign: "center", padding: 40, background: "rgba(201,134,110,0.08)", border: "1px solid rgba(201,134,110,0.2)", borderRadius: 10 }}>
                 <p style={{ color: "#C9866E", marginBottom: 16 }}>{analysisError}</p>
-                <button onClick={runAnalysis} style={{
-                  background: "#C9866E", border: "none", borderRadius: 7,
-                  padding: "10px 20px", cursor: "pointer", color: "#0D0C0A",
-                  fontFamily: "'DM Sans', sans-serif", fontSize: 13,
-                }}>
-                  Try again
-                </button>
+                <button onClick={runAnalysis} style={{ background: "#C9866E", border: "none", borderRadius: 7, padding: "10px 20px", cursor: "pointer", color: "#0D0C0A", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>Try again</button>
               </div>
             )}
 
-            {/* Analysis results */}
             {analysis && !analysisLoading && (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {/* Score hero */}
-                <div style={{
-                  background: "rgba(255,255,255,0.025)",
-                  border: `1px solid ${scoreColor}33`,
-                  borderRadius: 12, padding: "36px 32px",
-                  textAlign: "center",
-                }}>
-                  <div style={{
-                    fontSize: 72, fontFamily: "'Cormorant Garamond', serif",
-                    fontWeight: 300, color: scoreColor, lineHeight: 1,
-                    marginBottom: 8,
-                  }}>
-                    {analysis.overallScore}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#5A5448", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 20 }}>
-                    Compatibility Score
-                  </div>
-                  <p style={{
-                    fontFamily: "'Cormorant Garamond', serif",
-                    fontSize: 22, color: "#E8E0D0", fontWeight: 300,
-                    fontStyle: "italic", marginBottom: 16,
-                  }}>
-                    "{analysis.headline}"
-                  </p>
-                  <p style={{ color: "#8A8478", fontSize: 14, lineHeight: 1.7, maxWidth: 560, margin: "0 auto" }}>
-                    {analysis.summary}
-                  </p>
+                <div style={{ background: "rgba(255,255,255,0.025)", border: `1px solid ${scoreColor}33`, borderRadius: 12, padding: "36px 32px", textAlign: "center" }}>
+                  <div style={{ fontSize: 72, fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, color: scoreColor, lineHeight: "1", marginBottom: 8 }}>{analysis.overallScore}</div>
+                  <div style={{ fontSize: 11, color: "#5A5448", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 20 }}>Compatibility Score</div>
+                  <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: "#E8E0D0", fontWeight: 300, fontStyle: "italic", marginBottom: 16 }}>"{analysis.headline}"</p>
+                  <p style={{ color: "#8A8478", fontSize: 14, lineHeight: 1.7, maxWidth: 560, margin: "0 auto" }}>{analysis.summary}</p>
                 </div>
 
-                {/* Per-founder */}
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: `repeat(${Math.min(analysis.perFounder.length, 3)}, 1fr)`,
-                  gap: 12,
-                }}>
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(analysis.perFounder.length, 3)}, 1fr)`, gap: 12 }}>
                   {analysis.perFounder.map((f, idx) => (
-                    <div key={idx} style={{
-                      background: "rgba(255,255,255,0.02)",
-                      border: `1px solid ${FOUNDER_COLORS[idx]}33`,
-                      borderRadius: 10, padding: 20,
-                    }}>
+                    <div key={idx} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${FOUNDER_COLORS[idx]}33`, borderRadius: 10, padding: 20 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                        <div style={{
-                          width: 30, height: 30, borderRadius: "50%",
-                          background: FOUNDER_COLORS[idx] + "22",
-                          border: `1.5px solid ${FOUNDER_COLORS[idx]}55`,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 12, color: FOUNDER_COLORS[idx], fontWeight: 600,
-                        }}>
+                        <div style={{ width: 30, height: 30, borderRadius: "50%", background: FOUNDER_COLORS[idx] + "22", border: `1.5px solid ${FOUNDER_COLORS[idx]}55`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: FOUNDER_COLORS[idx], fontWeight: 600 }}>
                           {f.name[0].toUpperCase()}
                         </div>
                         <div>
@@ -1021,17 +761,9 @@ Only return valid JSON. No markdown, no preamble.`;
                   ))}
                 </div>
 
-                {/* Strengths & Tensions */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  {/* Strengths */}
-                  <div style={{
-                    background: "rgba(126,184,154,0.05)",
-                    border: "1px solid rgba(126,184,154,0.2)",
-                    borderRadius: 10, padding: 22,
-                  }}>
-                    <div style={{ fontSize: 11, color: "#7EB89A", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>
-                      ✦ Team Strengths
-                    </div>
+                  <div style={{ background: "rgba(126,184,154,0.05)", border: "1px solid rgba(126,184,154,0.2)", borderRadius: 10, padding: 22 }}>
+                    <div style={{ fontSize: 11, color: "#7EB89A", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>✦ Team Strengths</div>
                     {analysis.strengths.map((s, i) => (
                       <div key={i} style={{ marginBottom: 14 }}>
                         <div style={{ fontSize: 13, color: "#C0D4C8", fontWeight: 500, marginBottom: 4 }}>{s.title}</div>
@@ -1039,28 +771,13 @@ Only return valid JSON. No markdown, no preamble.`;
                       </div>
                     ))}
                   </div>
-
-                  {/* Tensions */}
-                  <div style={{
-                    background: "rgba(201,134,110,0.05)",
-                    border: "1px solid rgba(201,134,110,0.2)",
-                    borderRadius: 10, padding: 22,
-                  }}>
-                    <div style={{ fontSize: 11, color: "#C9866E", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>
-                      ⚡ Potential Tensions
-                    </div>
+                  <div style={{ background: "rgba(201,134,110,0.05)", border: "1px solid rgba(201,134,110,0.2)", borderRadius: 10, padding: 22 }}>
+                    <div style={{ fontSize: 11, color: "#C9866E", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>⚡ Potential Tensions</div>
                     {analysis.tensions.map((t, i) => (
                       <div key={i} style={{ marginBottom: 14 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                           <div style={{ fontSize: 13, color: "#D4C0B8", fontWeight: 500 }}>{t.title}</div>
-                          <span style={{
-                            fontSize: 9, padding: "2px 7px", borderRadius: 10, letterSpacing: "0.06em",
-                            background: t.severity === "high" ? "rgba(201,100,80,0.2)" : t.severity === "medium" ? "rgba(212,168,83,0.2)" : "rgba(126,184,154,0.15)",
-                            color: t.severity === "high" ? "#C9866E" : t.severity === "medium" ? "#D4A853" : "#7EB89A",
-                            textTransform: "uppercase",
-                          }}>
-                            {t.severity}
-                          </span>
+                          <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 10, letterSpacing: "0.06em", background: t.severity === "high" ? "rgba(201,100,80,0.2)" : t.severity === "medium" ? "rgba(212,168,83,0.2)" : "rgba(126,184,154,0.15)", color: t.severity === "high" ? "#C9866E" : t.severity === "medium" ? "#D4A853" : "#7EB89A", textTransform: "uppercase" }}>{t.severity}</span>
                         </div>
                         <div style={{ fontSize: 12, color: "#6A6458", lineHeight: 1.6 }}>{t.detail}</div>
                       </div>
@@ -1068,47 +785,23 @@ Only return valid JSON. No markdown, no preamble.`;
                   </div>
                 </div>
 
-                {/* Recommendations */}
-                <div style={{
-                  background: "rgba(212,168,83,0.05)",
-                  border: "1px solid rgba(212,168,83,0.2)",
-                  borderRadius: 10, padding: 24,
-                }}>
-                  <div style={{ fontSize: 11, color: "#D4A853", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>
-                    → Recommendations
-                  </div>
+                <div style={{ background: "rgba(212,168,83,0.05)", border: "1px solid rgba(212,168,83,0.2)", borderRadius: 10, padding: 24 }}>
+                  <div style={{ fontSize: 11, color: "#D4A853", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>→ Recommendations</div>
                   {analysis.topRecommendations.map((rec, i) => (
-                    <div key={i} style={{
-                      display: "flex", gap: 12, marginBottom: 12,
-                      paddingBottom: 12,
-                      borderBottom: i < analysis.topRecommendations.length - 1 ? "1px solid rgba(212,168,83,0.1)" : "none",
-                    }}>
-                      <span style={{
-                        fontSize: 10, color: "#D4A853", fontWeight: 600,
-                        minWidth: 18, paddingTop: 1,
-                      }}>
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
+                    <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12, paddingBottom: 12, borderBottom: i < analysis.topRecommendations.length - 1 ? "1px solid rgba(212,168,83,0.1)" : "none" }}>
+                      <span style={{ fontSize: 10, color: "#D4A853", fontWeight: 600, minWidth: 18, paddingTop: 1 }}>{String(i + 1).padStart(2, "0")}</span>
                       <p style={{ fontSize: 13, color: "#C0B090", lineHeight: 1.65 }}>{rec}</p>
                     </div>
                   ))}
                 </div>
 
-                {/* Re-run */}
                 <div style={{ textAlign: "center", paddingTop: 8 }}>
                   <button
                     onClick={runAnalysis}
-                    style={{
-                      background: "none", border: "1px solid rgba(212,168,83,0.25)",
-                      borderRadius: 7, padding: "10px 20px", cursor: "pointer",
-                      color: "#6A6458", fontFamily: "'DM Sans', sans-serif",
-                      fontSize: 12, transition: "all 0.2s",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.color = "#D4A853"; e.currentTarget.style.borderColor = "rgba(212,168,83,0.5)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.color = "#6A6458"; e.currentTarget.style.borderColor = "rgba(212,168,83,0.25)"; }}
-                  >
-                    ↺ Regenerate analysis
-                  </button>
+                    style={{ background: "none", border: "1px solid rgba(212,168,83,0.25)", borderRadius: 7, padding: "10px 20px", cursor: "pointer", color: "#6A6458", fontFamily: "'DM Sans', sans-serif", fontSize: 12, transition: "all 0.2s" }}
+                    onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#D4A853"; e.currentTarget.style.borderColor = "rgba(212,168,83,0.5)"; }}
+                    onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.color = "#6A6458"; e.currentTarget.style.borderColor = "rgba(212,168,83,0.25)"; }}
+                  >↺ Regenerate analysis</button>
                 </div>
               </div>
             )}
